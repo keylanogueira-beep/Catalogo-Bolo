@@ -1,0 +1,26 @@
+{
+    "name": "leandro/catalogo-bolos",
+    "description": "API REST - Catalogo de Bolos",
+    "type": "project",
+    "autoload": {
+        "psr-4": {
+            "Controllers\\": "Controllers/",
+            "Models\\": "Models/"
+        },
+        "files": [
+            "Config/configuracao.php"
+        ]
+    },
+    "authors": [
+        {
+            "name": "leandro",
+            "email": "leandro.r.souza@ba.estudante.senai.br"
+        }
+    ],
+    "minimum-stability": "dev",
+    "require": {
+        "php": ">= 8.3",
+        "ext-mbstring": "*",
+        "vlucas/phpdotenv": "^5.6@dev"
+    }
+}
