@@ -72,6 +72,7 @@ if (isset($uriSegments[0]) && $uriSegments[0] === 'bolos') {
             break;
     }
 } else {
+    
     http_response_code(404);
     echo json_encode(["status" => false, "mensagem" => "Endpoint não encontrado. Acesse /bolos"]);
 }
