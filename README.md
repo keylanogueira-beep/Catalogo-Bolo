@@ -1,0 +1,11 @@
+CREATE DATABASE IF NOT EXISTS catalogo_bolos;
+USE catalogo_bolos;
+
+CREATE TABLE IF NOT EXISTS bolos (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    nome VARCHAR(100) NOT NULL,
+    sabor VARCHAR(50) NOT NULL,
+    preco DECIMAL(10, 2) NOT NULL,
+    descricao TEXT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
