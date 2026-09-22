@@ -1,201 +1,83 @@
 <?php
 
-namespace Controllers;
+namespace App\Controller;
 
-use Models\Bolo;
-use Exception;
+use App\Model\BoloModel;
 
 class BoloController
 {
-    private Bolo $bolo;
+    private BoloModel $model;
 
-    public function __construct(Bolo $bolo)
+    public function __construct()
     {
-        $this->bolo = $bolo;
+        $this->model = new BoloModel();
     }
 
-    public function processar(string $metodo, ?string $id): void
+    public function index(): void
     {
-        header("Content-Type: application/json; charset=UTF-8");
+        $bolos = $this->model->getAll();
+        http_response_code(200);
+        echo json_encode(["status" => true, "data" => $bolos]);
+    }
 
-        if ($id !== null) {
-            match ($metodo) {
-                "GET" => $this->mostrar((int) $id),
-                "PATCH" => $this->atualizar((int) $id),
-                "DELETE" => $this->remover((int) $id),
-                default => $this->metodoInvalido(["GET", "PATCH", "DELETE"])
-            };
+    public function show(int $id): void
+    {
+        $bolo = $this->model->getById($id);
+        if ($bolo) {
+            http_response_code(200);
+            echo json_encode(["status" => true, "data" => $bolo]);
+        } else {
+            http_response_code(404);
+            echo json_encode(["status" => false, "mensagem" => "Bolo não encontrado"]);
+        }
+    }
 
+    public function store(): void
+    {
+        $data = json_decode(file_get_contents("php://input"), true);
+
+        if (empty($data['nome']) || empty($data['sabor']) || !isset($data['preco'])) {
+            http_response_code(400);
+            echo json_encode(["status" => false, "mensagem" => "Campos obrigatórios: nome, sabor, preco"]);
             return;
         }
 
-        match ($metodo) {
-            "GET" => $this->listar(),
-            "POST" => $this->cadastrar(),
-            default => $this->metodoInvalido(["GET", "POST"])
-        };
+        $id = $this->model->create($data);
+        http_response_code(201);
+        echo json_encode(["status" => true, "mensagem" => "Bolo cadastrado com sucesso", "id" => $id]);
     }
 
-    private function cadastrar(): void
+    public function update(int $id): void
     {
-        $dados = $this->lerCorpoRequisicao();
-        $erros = $this->validarDados($dados);
-
-        if (!empty($erros)) {
-            http_response_code(422);
-            echo json_encode(["erros" => $erros]);
+        if (!$this->model->getById($id)) {
+            http_response_code(404);
+            echo json_encode(["status" => false, "mensagem" => "Bolo não encontrado"]);
             return;
         }
 
-        try {
-            if ($this->bolo->existeComNome($dados["nome"])) {
-                http_response_code(409);
-                echo json_encode(["erros" => ["Já existe um bolo cadastrado com esse nome."]]);
-                return;
-            }
+        $data = json_decode(file_get_contents("php://input"), true);
 
-            $novoId = $this->bolo->cadastrar($dados["nome"], $dados["tipo"], $dados["descricao"] ?? null, (float) $dados["preco"]);
-            $boloCriado = $this->bolo->buscarPorId($novoId);
-
-            http_response_code(201);
-            echo json_encode($boloCriado);
-
-        } catch (Exception $erro) {
-            http_response_code(500);
-            echo json_encode(["erro" => $erro->getMessage()]);
+        if (empty($data['nome']) || empty($data['sabor']) || !isset($data['preco'])) {
+            http_response_code(400);
+            echo json_encode(["status" => false, "mensagem" => "Campos obrigatórios: nome, sabor, preco"]);
+            return;
         }
+
+        $this->model->update($id, $data);
+        http_response_code(200);
+        echo json_encode(["status" => true, "mensagem" => "Bolo atualizado com sucesso"]);
     }
 
-    private function listar(): void
+    public function destroy(int $id): void
     {
-        try {
-            $bolos = $this->bolo->buscarTodos();
-
-            http_response_code(200);
-            echo json_encode($bolos);
-
-        } catch (Exception $erro) {
-            http_response_code(500);
-            echo json_encode(["erro" => $erro->getMessage()]);
-        }
-    }
-
-    private function mostrar(int $id): void
-    {
-        try {
-            $bolo = $this->bolo->buscarPorId($id);
-
-            if ($bolo === null) {
-                http_response_code(404);
-                echo json_encode(["erro" => "Bolo não encontrado."]);
-                return;
-            }
-
-            http_response_code(200);
-            echo json_encode($bolo);
-
-        } catch (Exception $erro) {
-            http_response_code(500);
-            echo json_encode(["erro" => $erro->getMessage()]);
-        }
-    }
-
-    private function atualizar(int $id): void
-    {
-        try {
-            $boloAtual = $this->bolo->buscarPorId($id);
-
-            if ($boloAtual === null) {
-                http_response_code(404);
-                echo json_encode(["erro" => "Bolo não encontrado."]);
-                return;
-            }
-
-            $dados = $this->lerCorpoRequisicao();
-
-            $nome = $dados["nome"] ?? $boloAtual["nome"];
-            $tipo = $dados["tipo"] ?? $boloAtual["tipo"];
-            $descricao = $dados["descricao"] ?? $boloAtual["descricao"];
-            $preco = $dados["preco"] ?? $boloAtual["preco"];
-
-            $erros = $this->validarDados(["nome" => $nome, "tipo" => $tipo, "preco" => $preco]);
-
-            if (!empty($erros)) {
-                http_response_code(422);
-                echo json_encode(["erros" => $erros]);
-                return;
-            }
-
-            if ($nome !== $boloAtual["nome"] && $this->bolo->existeComNome($nome, $id)) {
-                http_response_code(409);
-                echo json_encode(["erros" => ["Já existe um bolo cadastrado com esse nome."]]);
-                return;
-            }
-
-            $this->bolo->atualizar($id, $nome, $tipo, $descricao, (float) $preco);
-            $boloAtualizado = $this->bolo->buscarPorId($id);
-
-            http_response_code(200);
-            echo json_encode($boloAtualizado);
-
-        } catch (Exception $erro) {
-            http_response_code(500);
-            echo json_encode(["erro" => $erro->getMessage()]);
-        }
-    }
-
-    private function remover(int $id): void
-    {
-        try {
-            $bolo = $this->bolo->buscarPorId($id);
-
-            if ($bolo === null) {
-                http_response_code(404);
-                echo json_encode(["erro" => "Bolo não encontrado."]);
-                return;
-            }
-
-            $this->bolo->remover($id);
-
-            http_response_code(204);
-
-        } catch (Exception $erro) {
-            http_response_code(500);
-            echo json_encode(["erro" => $erro->getMessage()]);
-        }
-    }
-
-    private function lerCorpoRequisicao(): array
-    {
-        $conteudo = file_get_contents("php://input");
-        $dados = json_decode($conteudo, true);
-
-        return is_array($dados) ? $dados : [];
-    }
-
-    private function validarDados(array $dados): array
-    {
-        $erros = [];
-
-        if (empty($dados["nome"])) {
-            $erros[] = "Informe o nome do bolo.";
+        if (!$this->model->getById($id)) {
+            http_response_code(404);
+            echo json_encode(["status" => false, "mensagem" => "Bolo não encontrado"]);
+            return;
         }
 
-        if (empty($dados["tipo"])) {
-            $erros[] = "Informe o tipo do bolo.";
-        }
-
-        if (!isset($dados["preco"]) || !is_numeric($dados["preco"]) || $dados["preco"] <= 0) {
-            $erros[] = "Informe um preço válido, maior que zero.";
-        }
-
-        return $erros;
-    }
-
-    private function metodoInvalido(array $permitidos): void
-    {
-        header("Allow: " . implode(", ", $permitidos));
-        http_response_code(405);
-        echo json_encode(["erro" => "Método não permitido."]);
+        $this->model->delete($id);
+        http_response_code(200);
+        echo json_encode(["status" => true, "mensagem" => "Bolo removido com sucesso"]);
     }
 }
