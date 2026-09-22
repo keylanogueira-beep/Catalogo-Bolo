@@ -1,32 +1,77 @@
 <?php
-session_start();
-require_once "vendor/autoload.php";
 
-use Models\Bolo;
-use Controllers\BoloController;
+require_once __DIR__ . '/vendor/autoload.php';
 
-$caminho = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
-$partes = explode("/", $caminho);
+use Dotenv\Dotenv;
+use App\Controller\BoloController;
 
-$recurso = $partes[2] ?? null;
-$id = $partes[3] ?? null;
+// Carregar variáveis de ambiente
+if (file_exists(__DIR__ . '/.env')) {
+    $dotenv = Dotenv::createImmutable(__DIR__);
+    $dotenv->load();
+}
 
+// Configurações de cabeçalho para API REST / CORS
+header("Access-Control-Allow-Origin: *");
 header("Content-Type: application/json; charset=UTF-8");
+header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
+header("Access-Control-Allow-Headers: Content-Type, Access-Control-Allow-Headers, Authorization, X-Requested-With");
 
-if ($recurso !== "bolos") {
-    http_response_code(404);
-    echo json_encode(["erro" => "Rota não encontrada."]);
+$method = $_SERVER['REQUEST_METHOD'];
+
+if ($method === 'OPTIONS') {
+    http_response_code(200);
     exit;
 }
 
-try {
-    $bolo = new Bolo();
-    $controller = new BoloController($bolo);
+// Obter a rota atual
+$uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+$uriSegments = explode('/', trim($uri, '/'));
 
-    $controller->processar($_SERVER['REQUEST_METHOD'], $id);
+// Pega o ID caso informado na URI (ex: /bolos/1)
+$id = isset($uriSegments[1]) && is_numeric($uriSegments[1]) ? (int)$uriSegments[1] : null;
 
-} catch (\Throwable $erro) {
-    error_log($erro->getMessage());
-    http_response_code(500);
-    echo json_encode(["erro" => "Erro interno do servidor."]);
+$controller = new BoloController();
+
+// Roteamento RESTful
+if (isset($uriSegments[0]) && $uriSegments[0] === 'bolos') {
+    switch ($method) {
+        case 'GET':
+            if ($id) {
+                $controller->show($id);
+            } else {
+                $controller->index();
+            }
+            break;
+
+        case 'POST':
+            $controller->store();
+            break;
+
+        case 'PUT':
+            if ($id) {
+                $controller->update($id);
+            } else {
+                http_response_code(400);
+                echo json_encode(["status" => false, "mensagem" => "ID é necessário para atualizar"]);
+            }
+            break;
+
+        case 'DELETE':
+            if ($id) {
+                $controller->destroy($id);
+            } else {
+                http_response_code(400);
+                echo json_encode(["status" => false, "mensagem" => "ID é necessário para deletar"]);
+            }
+            break;
+
+        default:
+            http_response_code(455);
+            echo json_encode(["status" => false, "mensagem" => "Método não permitido"]);
+            break;
+    }
+} else {
+    http_response_code(404);
+    echo json_encode(["status" => false, "mensagem" => "Endpoint não encontrado. Acesse /bolos"]);
 }
